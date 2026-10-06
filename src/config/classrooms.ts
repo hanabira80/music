@@ -8,6 +8,7 @@ export interface Classroom {
 
 export const CAST_PORT = 8009;
 export const AIRPLAY_PORT = 51010;
+export const SPEAKER_TONE_ROOM_ID = "c3";
 
 export const DEFAULT_CLASSROOMS: Classroom[] = [
   { id: "c1", name: "2-7반", ip: "172.30.7.104", port: 1400, active: false },

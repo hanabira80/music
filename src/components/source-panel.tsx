@@ -95,6 +95,15 @@ export function SourcePanel() {
           {lanOrigin ? ` 이 맥 주소 ${lanOrigin}` : ""}
         </p>
 
+        <div className="flex flex-col gap-2">
+          <Button type="button" size="lg" variant="secondary" disabled={busy} onClick={() => void send("tone")}>
+            2-8반 시험음
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            2-8반 스피커로만 3초짜리 소리를 넣습니다. 노래 파일은 보내지 않습니다.
+          </p>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

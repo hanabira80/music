@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { DEFAULT_CLASSROOMS } from "@/config/classrooms";
+import { DEFAULT_CLASSROOMS, SPEAKER_TONE_ROOM_ID } from "@/config/classrooms";
 import type {
   AudioSource,
   BroadcastAction,
@@ -158,7 +158,8 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const classroomIds = Object.entries(selected)
       .filter(([, on]) => on)
       .map(([id]) => id);
-    if (classroomIds.length === 0) {
+    const ids = action === "tone" ? [SPEAKER_TONE_ROOM_ID] : classroomIds;
+    if (ids.length === 0) {
       set({ notice: "보낼 반을 골라 주세요." });
       return;
     }
@@ -172,11 +173,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       const response = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, classroomIds, volume, source }),
+        body: JSON.stringify({ action, classroomIds: ids, volume, source }),
       });
       let anyOk = false;
       await readNdjson(response, (entry) => {
-        if (entry.ok && (entry.action === "Play" || entry.action === "Pause" || entry.action === "Stop")) {
+        if (entry.ok && (entry.action === "Play" || entry.action === "Pause" || entry.action === "Stop" || entry.action === "Tone")) {
           anyOk = true;
         }
         if (entry.ok && entry.action === "SetVolume" && action === "volume") anyOk = true;
@@ -191,8 +192,15 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
               ? "paused"
               : action === "stop" && anyOk
                 ? "stopped"
-                : get().transport,
-        notice: anyOk ? "" : "고른 칠판이 응답하지 않았습니다.",
+                : action === "tone"
+                  ? "stopped"
+                  : get().transport,
+        notice:
+          action === "tone" && anyOk
+            ? "2-8반 칠판을 봐 주세요. 화면이 그대로인지, 소리가 나는지 적어 두면 됩니다."
+            : anyOk
+              ? ""
+              : "고른 칠판이 응답하지 않았습니다.",
       });
     } catch (error) {
       set({
