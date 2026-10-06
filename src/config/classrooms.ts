@@ -14,4 +14,5 @@ export const DEFAULT_CLASSROOMS: Classroom[] = [
   { id: "c2", name: "2-6반", ip: "172.30.8.20", port: 1400, active: false },
   { id: "c3", name: "2-8반", ip: "172.30.7.209", port: AIRPLAY_PORT, active: false },
   { id: "c4", name: "2-1반", ip: "172.30.5.24", port: AIRPLAY_PORT, active: false },
+  { id: "c5", name: "9반", ip: "172.30.7.118", port: AIRPLAY_PORT, active: false },
 ];
