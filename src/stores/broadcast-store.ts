@@ -22,6 +22,7 @@ type BroadcastState = {
   notice: string;
   logs: TransmissionLog[];
   lanOrigin: string;
+  lanSsid: string;
   toggle: (id: string) => void;
   selectAll: () => void;
   clearSelection: () => void;
@@ -74,6 +75,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   notice: "",
   logs: [],
   lanOrigin: "",
+  lanSsid: "",
   toggle: (id) =>
     set((state) => ({
       selected: { ...state.selected, [id]: !state.selected[id] },
@@ -106,8 +108,8 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   loadHost: async () => {
     const response = await fetch("/api/host");
     if (!response.ok) return;
-    const payload = (await response.json()) as { origin?: string };
-    set({ lanOrigin: payload.origin ?? "" });
+    const payload = (await response.json()) as { origin?: string; ssid?: string };
+    set({ lanOrigin: payload.origin ?? "", lanSsid: payload.ssid ?? "" });
   },
   probe: async () => {
     set({ probing: true });
@@ -176,8 +178,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
         body: JSON.stringify({ action, classroomIds: ids, volume, source }),
       });
       let anyOk = false;
+      let toneNote = "";
       await readNdjson(response, (entry) => {
-        if (entry.ok && (entry.action === "Play" || entry.action === "Pause" || entry.action === "Stop" || entry.action === "Tone")) {
+        if (entry.action === "Tone") toneNote = entry.message;
+        const toneSent = entry.ok && entry.action === "Tone" && entry.message.startsWith("시험음");
+        if (entry.ok && (entry.action === "Play" || entry.action === "Pause" || entry.action === "Stop" || toneSent)) {
           anyOk = true;
         }
         if (entry.ok && entry.action === "SetVolume" && action === "volume") anyOk = true;
@@ -197,10 +202,12 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
                   : get().transport,
         notice:
           action === "tone" && anyOk
-            ? "2-8반 칠판을 봐 주세요. 화면이 그대로인지, 소리가 나는지 적어 두면 됩니다."
-            : anyOk
-              ? ""
-              : "고른 칠판이 응답하지 않았습니다.",
+            ? "2-7반 칠판을 봐 주세요. 화면이 그대로인지, 소리가 나는지 적어 두면 됩니다."
+            : action === "tone"
+              ? toneNote || "고른 칠판이 응답하지 않았습니다."
+              : anyOk
+                ? ""
+                : "고른 칠판이 응답하지 않았습니다.",
       });
     } catch (error) {
       set({

@@ -3,10 +3,12 @@ import dgram from "node:dgram";
 import net from "node:net";
 import os from "node:os";
 import type { Classroom } from "@/config/classrooms";
-import { SPEAKER_TONE_ROOM_ID } from "@/config/classrooms";
+import { DEFAULT_CLASSROOMS, SPEAKER_TONE_ROOM_ID } from "@/config/classrooms";
+import { readAirPlayServerInfo } from "@/lib/airplay-controller";
+import { speakerPortFromInfo } from "@/lib/airplay-info";
 import { ALAC_FRAME_SAMPLES, ALAC_SAMPLE_RATE, alacToneFrames } from "@/lib/alac-tone";
 import type { TransmissionLog } from "@/lib/broadcast-types";
-import { getLanIp } from "@/lib/local-ip";
+import { getLanIp, isSchoolLan } from "@/lib/local-ip";
 
 const TONE_SECONDS = 3;
 
@@ -40,12 +42,13 @@ function log(
 }
 
 function sourceIp(target: string) {
+  const school = isSchoolLan(target);
   const prefix = target.split(".").slice(0, 2).join(".");
   for (const addresses of Object.values(os.networkInterfaces())) {
     for (const address of addresses ?? []) {
-      if (address.family === "IPv4" && !address.internal && address.address.startsWith(`${prefix}.`)) {
-        return address.address;
-      }
+      if (address.family !== "IPv4" || address.internal) continue;
+      if (school && isSchoolLan(address.address)) return address.address;
+      if (!school && address.address.startsWith(`${prefix}.`)) return address.address;
     }
   }
   return getLanIp();
@@ -182,7 +185,8 @@ const TONE_FRAMES = alacToneFrames();
 let toneBusy = false;
 
 export function isSpeakerToneRoom(room: Classroom) {
-  return room.id === SPEAKER_TONE_ROOM_ID && room.ip === "172.30.7.209";
+  const target = DEFAULT_CLASSROOMS.find((item) => item.id === SPEAKER_TONE_ROOM_ID);
+  return room.id === SPEAKER_TONE_ROOM_ID && room.ip === target?.ip;
 }
 
 export async function playSpeakerTone(
@@ -191,7 +195,7 @@ export async function playSpeakerTone(
   emit: (entry: TransmissionLog) => void,
 ) {
   if (!isSpeakerToneRoom(room)) {
-    emit(log(room, null, 0, false, "시험음은 2-8반만 보냅니다", "idle"));
+    emit(log(room, null, 0, false, "시험음은 2-7반만 보냅니다", "idle"));
     return;
   }
   if (toneBusy) {
@@ -202,12 +206,45 @@ export async function playSpeakerTone(
   toneBusy = true;
   const started = Date.now();
   let stage: "connect" | "send" = "connect";
+  let opened: { key: string; port: number } | null = null;
   let rtsp: RtspSession | null = null;
   let control: dgram.Socket | null = null;
   let timing: dgram.Socket | null = null;
   let audio: dgram.Socket | null = null;
   try {
-    const socket = await connectTcp(room.ip, room.port);
+    const info = await readAirPlayServerInfo(room.ip, room.port);
+    if (info.status !== 200) {
+      emit(log(room, info.status, Date.now() - started, false, "칠판에 연결하지 못했습니다", "offline"));
+      return;
+    }
+    const found = speakerPortFromInfo(info.body);
+    if (!found.port || !found.key) {
+      const seen = found.keys.length > 0 ? found.keys.slice(0, 8).join(", ") : "없음";
+      emit(
+        log(
+          room,
+          info.status,
+          Date.now() - started,
+          false,
+          `${room.port} 상태 답장에 스피커 포트가 없었습니다. 답장 키: ${seen}`,
+          "idle",
+        ),
+      );
+      return;
+    }
+    opened = { key: found.key, port: found.port };
+    emit(
+      log(
+        room,
+        info.status,
+        Date.now() - started,
+        true,
+        `${room.port} 상태 답장 ${found.key}=${found.port}. 이 번호로 스피커를 엽니다`,
+        "idle",
+      ),
+    );
+
+    const socket = await connectTcp(room.ip, found.port);
     rtsp = new RtspSession(socket);
     const sessionId = randomInt(1, 2 ** 31);
     const uri = `rtsp://${room.ip}/${sessionId}`;
@@ -347,7 +384,11 @@ export async function playSpeakerTone(
         null,
         Date.now() - started,
         false,
-        stage === "send" ? "시험음 전송이 끊겼습니다" : "칠판에 연결하지 못했습니다",
+        stage === "send"
+          ? "시험음 전송이 끊겼습니다"
+          : opened
+            ? `${opened.key}=${opened.port}로 열다 끊겼습니다`
+            : "칠판에 연결하지 못했습니다",
         stage === "send" ? "idle" : "offline",
       ),
     );

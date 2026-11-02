@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   if (action === "tone") {
     if (rooms.length !== 1 || !isSpeakerToneRoom(rooms[0])) {
-      return Response.json({ error: "시험음은 2-8반만 보냅니다." }, { status: 400 });
+      return Response.json({ error: "시험음은 2-7반만 보냅니다." }, { status: 400 });
     }
   } else if (action === "play") {
     try {
@@ -63,12 +63,12 @@ export async function POST(request: Request) {
         if (!record) return Response.json({ error: "올린 음원을 찾지 못했습니다." }, { status: 404 });
         mime = record.mime;
         title = record.name;
-        mediaUrl = `${originFromRequest(request)}/api/stream/${record.id}`;
+        mediaUrl = `${originFromRequest(request)}/api/stream/${record.id}${mime === "audio/wav" ? ".wav" : ".mp3"}`;
       } else {
         const remote = assertStreamUrl(body.source.url);
         const record = await registerUrl(remote);
         title = "Stream";
-        mediaUrl = `${originFromRequest(request)}/api/stream/${record.id}`;
+        mediaUrl = `${originFromRequest(request)}/api/stream/${record.id}.mp3`;
       }
     } catch (error) {
       return Response.json(

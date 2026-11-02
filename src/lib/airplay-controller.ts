@@ -27,6 +27,40 @@ function log(
   };
 }
 
+export function readAirPlayServerInfo(host: string, port: number, timeoutMs = 4000) {
+  return new Promise<{ status: number | null; body: Buffer; latencyMs: number }>((resolve) => {
+    const started = Date.now();
+    const socket = net.connect({ host, port });
+    const payload = Buffer.from(
+      [`GET /server-info HTTP/1.1`, `Host: ${host}`, "User-Agent: AirPlay/220.68", "Content-Length: 0", "Connection: close", "", ""].join("\r\n"),
+    );
+    let buf = Buffer.alloc(0);
+    let settled = false;
+    const finish = (status: number | null, body: Buffer) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve({ status, body, latencyMs: Date.now() - started });
+    };
+    const timer = setTimeout(() => finish(null, Buffer.alloc(0)), timeoutMs);
+    socket.on("error", () => finish(null, Buffer.alloc(0)));
+    socket.on("data", (chunk: Buffer) => {
+      buf = Buffer.concat([buf, chunk]);
+      const split = buf.indexOf("\r\n\r\n");
+      if (split < 0) return;
+      const head = buf.subarray(0, split).toString("latin1");
+      const length = Number(head.match(/Content-Length:\s*(\d+)/i)?.[1] ?? 0);
+      if (buf.length < split + 4 + length) return;
+      const status = Number(head.match(/^HTTP\/1\.[01] (\d+)/)?.[1] ?? 0) || null;
+      finish(status, buf.subarray(split + 4, split + 4 + length));
+    });
+    socket.on("connect", () => {
+      socket.write(payload);
+    });
+  });
+}
+
 function airplayRequest(
   host: string,
   port: number,
