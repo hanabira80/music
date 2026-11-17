@@ -20,4 +20,4 @@ export type TransmissionLog = {
   deviceStatus?: DeviceStatus;
 };
 
-export type BroadcastAction = "play" | "pause" | "stop" | "volume";
+export type BroadcastAction = "play" | "pause" | "stop" | "volume" | "tone";

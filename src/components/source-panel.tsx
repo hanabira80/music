@@ -21,6 +21,7 @@ export function SourcePanel() {
   const transport = useBroadcastStore((state) => state.transport);
   const notice = useBroadcastStore((state) => state.notice);
   const lanOrigin = useBroadcastStore((state) => state.lanOrigin);
+  const lanSsid = useBroadcastStore((state) => state.lanSsid);
   const setUrlDraft = useBroadcastStore((state) => state.setUrlDraft);
   const setVolume = useBroadcastStore((state) => state.setVolume);
   const useUrlSource = useBroadcastStore((state) => state.useUrlSource);
@@ -92,8 +93,17 @@ export function SourcePanel() {
         </p>
         <p className="text-xs text-muted-foreground">
           MP3로 보내면 칠판은 화면을 나누지 않고 소리만 냅니다.
-          {lanOrigin ? ` 이 맥 주소 ${lanOrigin}` : ""}
+          {lanOrigin ? ` 이 맥 주소 ${lanOrigin}${lanSsid ? ` · SSID ${lanSsid}` : ""}` : ""}
         </p>
+
+        <div className="flex flex-col gap-2">
+          <Button type="button" size="lg" variant="secondary" disabled={busy} onClick={() => void send("tone")}>
+            2-7반 시험음
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            2-7반만. 51010 상태 답장에 적힌 포트로 3초를 넣습니다. 번호가 없으면 소리를 보내지 않습니다.
+          </p>
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <Button
